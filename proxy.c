@@ -19,12 +19,12 @@
 static const char *user_agent = "User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:10.0.3) Gecko/20120305 Firefox/10.0.3\r\n";
 static const char *acceptHdr = "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\r\n";
 static const char *accept_encoding = "Accept-Encoding: gzip, deflate\r\n";
-static const char *connction = "Connection: close\r\n";
-static const char *pconnection = "Proxy-Connection: close\r\n";
+//static const char *connction = "Connection: close\r\n";
+//static const char *pconnection = "Proxy-Connection: close\r\n";
 
 
-void parseReq (int connfd,char* newReq,char* reqhdr,char* host);
-char* read_reqhdrs(rio_t *rp,char* reqhdr,char* host);
+void parseReq (int connfd,char* newReq,char* host);
+char* read_reqhdrs(rio_t *rp,char* host);
 char* geturlHost(char* url, char* host);
 void makeReq(char* host,char* newReq,char* reqheader,char* response);
 
@@ -69,21 +69,14 @@ int main(int argc,char** argv){
         
         printf("now parsing request\n");
         
-        //allocate mem for the reqest and the header
-        char* reqhdr = (char*) malloc(MAXHDR+1);
-        char* newReq = (char*) malloc(MAXLINE+1);
-        char* host = (char*) malloc(MAXLINE+1);
         char* response = (char*) malloc(MAX_OBJECT_SIZE+1);
-        
-        reqhdr = "";
-        newReq = "";
-        host = "";
+       
         response = "";
+        printf("going in parseReq\n");
         //parse the inputs and put it in the allocated space
-        parseReq(connfd,newReq,reqhdr,host);
+        parseReq(connfd,newReq,host);
         
-        //make new request
-        makeReq(host,newReq,reqhdr,response);
+
         
         //return the content to the client
         Rio_writen(connfd,response, strlen(response));
@@ -97,22 +90,32 @@ int main(int argc,char** argv){
     return 0;
 }
 
-void parseReq (int connfd,char* newReq,char* reqhdr,char* host) {
+void parseReq (int connfd,char* newReq,char* host) {
     //int is_static;
-    struct stat sbuf;
+    //struct stat sbuf;
     char buf[MAXLINE], method[MAXLINE], url[MAXLINE], version[MAXLINE];
-    char filename[MAXLINE], cgiargs[MAXLINE];
+    char newReq[MAXLINE], reqheader[MAXLINE];
     char* oldHost;
     rio_t rio;
 
     Rio_readinitb(&rio,connfd);
     Rio_readlineb(&rio, buf, MAXLINE);
     sscanf(buf, "%s %s %s", method, url, version);
+    
+    if (strcasecmp(method, "GET")) {
+      printf("can't do\n");
+      return;
+    }
 
+    sprintf(newReq, "%s %s %s",method,url,version);
+    
+    printf("method: %s ; url: %s ; version: %s\n",method, url, version);
+    
     //takes care of the header and returns the host header
     //from the request 
-    oldHost = read_reqhdrs(&rio,reqhdr,host);
-
+    oldHost = read_reqhdrs(&rio);
+    printf("going to %s\n",oldHost);
+    
     //write the new request
     if (strcmp(oldHost,"")){
         //if can't find host in hdr and the url, return error msg
@@ -123,6 +126,10 @@ void parseReq (int connfd,char* newReq,char* reqhdr,char* host) {
             exit(1);
         }
     }
+    
+    printf("going in makeReq\n");
+    //make new request
+    makeReq(oldHost,newReq,reqheader,response);
 
     return;
 
@@ -131,19 +138,26 @@ void parseReq (int connfd,char* newReq,char* reqhdr,char* host) {
 /* This function reads the header and returns to parseReq
  * and determine what should be ignored and what should be forwarded
  */
-char* read_reqhdrs(rio_t *rp,char* reqhdr,char* host){
+char* read_reqhdrs(rio_t *rp){
+    char all[MAXHDR]; 
+    char buf[MAXLINE];
+    printf("reading header\n");
+    
     //first read in all the headers
-    Rio_readlineb(rp, reqhdr, MAXHDR);
-    while(strcmp(reqhdr, "\r\n")) {
-        Rio_readlineb(rp, reqhdr, MAXHDR);
-        printf("%s", reqhdr);
+    Rio_readlineb(rp, buf, MAXHDR);
+    printf("%s", buf);
+    
+    while(strcmp(buf, "\r\n")) {
+        printf("in loop %s", buf);
+        strcat(all,buf);
+        Rio_readlineb(rp, buf, MAXHDR);
     }
-   
-    host = strstr(reqhdr,"host:");
+    printf("all hdr %s\n",all);
+    buf = strstr(all,"Host:");
     //it contains a null char
-    host += 5;
+    buf += 5;
 
-    return host;
+    return buf;
 }
 
 char* geturlHost(char* url, char* host){
