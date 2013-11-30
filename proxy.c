@@ -160,11 +160,12 @@ char* read_reqhdrs(rio_t *rp){
     return buf;
 }
 
-char* geturlHost(char* url, char* host){
-    char* end = strstr(url,"/");
-    host = end;
-    return host;
-
+char* geturlHost(char* url, char* cpy){
+    char cpy[strlen(url)+1];
+    strcpy(cpy,url);
+    char* end = strstr(cpy,"/");
+    *end = '\0';
+    return cpy;
 }
 
 
@@ -174,8 +175,8 @@ char* geturlHost(char* url, char* host){
  * detects how big the response is and write \0 at the end
  */
 
-void makeReq(char* host,char* newReq,char* reqheader,char* response){
-    
+char* makeReq(char* host,char* newReq,char* reqheader){
+    char* buf[MAX_OBJECT_SIZE];
     int clientfd, port;
     rio_t rio;
     const char* endStr = "\r\n"; 
@@ -190,11 +191,12 @@ void makeReq(char* host,char* newReq,char* reqheader,char* response){
     Rio_writen(clientfd, reqheader, strlen(reqheader));
     Rio_writen(clientfd,endStr,strlen(endStr));
     
-    Rio_readlineb(&rio, response, MAX_OBJECT_SIZE);
+    Rio_readlineb(&rio, buf, MAX_OBJECT_SIZE);
     
-    printf("response: %s\n",response);
+    printf("response: %s\n",buf);
 
     Close(clientfd);
+    return buf;
 }
 
 
